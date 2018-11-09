@@ -19,8 +19,9 @@ class BreakingChangeModuleIdentifier {
     compiler.plugin("compilation", (compilation) => {
       compilation.plugin("before-module-ids", (modules) => {
         modules.map(module => {
-          if (module.rawRequest) {
-            const moduleData = createModuleData(module.rawRequest); 
+          if (module.rawRequest && module.portableId) {
+            const { rawRequest, portableId } = module;
+            const moduleData = createModuleData(rawRequest, portableId); 
             module.id = md5(moduleData);
           }
         });
@@ -29,10 +30,17 @@ class BreakingChangeModuleIdentifier {
   }
 };
 
-const createModuleData = (rawRequest) => {
+const createModuleData = (rawRequest, portableId) => {
   let moduleData = "";
   const { name, author, version } = rawRequest;
-  if (name) moduleData += name
+
+  if (name) {
+    moduleData += name
+    // use the portable id to make modules within the same package unique
+    // split after the package name to make it not dependent on path
+    moduleData += portableId.split(name).slice(1).join("")
+  }
+
   if (author) {
     if (typeof author === 'string')  {
       moduleData += author
@@ -40,9 +48,11 @@ const createModuleData = (rawRequest) => {
       moduleData += author.name;
     }
   }
+
   const [x, y, z] = version.split('.');
   if (x) moduleData += x;
   if (y) moduleData += y;
+
   return moduleData;
 };
 
