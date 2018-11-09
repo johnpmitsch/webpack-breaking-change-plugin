@@ -1,0 +1,6 @@
+*.swp
+*.swo
+bundle.js
+vendor.js
+records.json
+node_modules
