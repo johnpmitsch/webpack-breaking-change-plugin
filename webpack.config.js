@@ -3,15 +3,19 @@ const webpack = require('webpack');
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 const pkg = require('./package.json');
 const BreakingChangeModuleIdentifier = require('./plugins/breaking-change-module-identifier.js');
+const SimpleNamedModules = require('./plugins/simple_named_modules.js');
 
 const config = {
   entry: {
     bundle: './app.js',
-    vendor: ['jquery', 'uuid', 'async'],
+    vendor: ['my-meta-package'],
   },
   output: {
     path: __dirname,
     filename: '[name].js'
+  },
+  devServer: {
+    contentBase: path.resolve(__dirname, '.')
   },
   plugins: [      
     new webpack.NoEmitOnErrorsPlugin(),
@@ -27,7 +31,8 @@ const config = {
       },
       sourceMap: true
     }),
-    new BreakingChangeModuleIdentifier()
+    new SimpleNamedModules()
+    //new BreakingChangeModuleIdentifier()
   ],
   module:{
     rules: [

@@ -1,27 +1,172 @@
-## Webpack test repo ##
+# Using a meta package to hold your dependencies
 
-### For testing out webpack configurations/plugins ###
+We are going to update our app to use a meta package to hold our dependencies:
 
-To build use ```npm run build```
+In package.json, replaced all dependencies with:
+ ```json
+ "dependencies": {
+   "my-meta-package": "file:my-meta-package"
+ },
+```
+Create `my-meta-package` folder inside project, `npm init`, and add removed dependencies to `my-meta-package`'s `package.json`
 
-`npm run build` creates two bundles: bundle.js (app code) and vendor.js (third-party code)
+In `./my-meta-package` have `vendor` directory, which has `$DEPENDENCY` directory that exports module.
 
-This uses a webpack plugin to create a hash based on the name, author, major version, and minor version of a package. This plugin is used as a module identifier.
+i.e. for jquery:
+``` javascript
+// vendor/jquery/jquery.js
+import jquery from 'jquery';
+  
+export default jquery;
 
-The idea is, if a build of vendor.js doesn't alter the patch (z in x.y.z) versions of any packages, it should be consistent with any existing bundles. 
+// vendor/jquery/index.js
+export { default as jquery } from './jquery';
+```
 
-In addition to the bundles webpack creates a records.json file, which shows module identifiers.
+This is done for each dependency, then all are exported in `my-meta-package`'s index.js
+
+```javascript
+export * from './vendor/jquery';
+```
+
+`npm run build` to build the bundles. The webpack config splits `my-meta-package` to `vendor.js` and application code to `bundle.js`
+ 
+ With *no naming plugins* added to webpack config, webpack assigns numeric value as module identifier. We can see this in `records.json` file
+ 
+ ```json
+     "byIdentifier": {
+      "node_modules/babel-loader/lib/index.js!my-meta-package/index.js 7e3949d45ab3c7431ae7f502c88d1403": 0,
+      "my-meta-package/node_modules/uuid/lib/rng-browser.js": 1,
+      "my-meta-package/node_modules/uuid/lib/bytesToUuid.js": 2,
+      "node_modules/babel-loader/lib/index.js!app.js": 3,
+      "my-meta-package/node_modules/jquery/dist/jquery.js": 4,
+      "my-meta-package/node_modules/uuid/index.js": 5,
+      "my-meta-package/node_modules/uuid/v1.js": 6,
+      "my-meta-package/node_modules/uuid/v4.js": 7,
+      "multi my-meta-package": 8
+    },
+```
+
+Lets look at what webpack is specifying in `bundle.js`
+```javascript
+webpackJsonp(
+  [0],
+  {
+    3: function(e, t, u) {
+      "use strict";
+      Object.defineProperty(t, "__esModule", { value: !0 });
+      var c = u(0);
+      Object(c.jquery)(document).ready(() => {
+        Object(c.jquery)("#welcome").text("welcome!"),
+          Object(c.jquery)("#uuid").text(Object(c.uuid)());
+      });
+    }
+  },
+  [3]
+);
+```
+
+Notice the `var c = u(0);`? If we look at `records.json`, we can see 0 is referencing `my-meta-package`
+```json
+  "node_modules/babel-loader/lib/index.js!my-meta-package/index.js 7e3949d45ab3c7431ae7f502c88d1403": 0,
+```
+
+From the metapackage, its dependencies are referenced by name in bundle.js i.e. `c.jquery` and `c.uuid`
 
 
-To test out the concept do the following:
-1. `npm i`
-1. `npm run build`
-2. `cp records.json /tmp/records.json`
-3. change the z-version of a package in package.json, i.e. change jquery from 3.3.1 to 3.3.0
-4. `npm i`
-5. `npm run build`
-6. `diff records.json /tmp/record.old.json` There should be no difference here as no major or minor versions were changed.
-7. change the y-version of a package in package.json, i.e. change jquery from 3.3.0 to 3.2.0
-8. `npm i`
-5. `npm run build`
-6. `diff records.json /tmp/record.old.json`  Now you should see a difference in hashes since the a y-version has changed.
+What does this mean?
+
+If we generate a new `bundle.js`, it can be used with an previously-built (but still compatible) `vendor.js` *as long as* the module identifier stays the same for `my-meta-package`
+
+
+Lets see what happens we add the `SimpleNamedModule` plugin that we [currently use in Foreman](https://github.com/theforeman/foreman/blob/develop/webpack/simple_named_modules.js).
+
+After removing the existing `records.json` and rebuilding, the `records.json` looks like this:
+```json
+    "byIdentifier": {
+      "node_modules/babel-loader/lib/index.js!app.js": "./app.js",
+      "node_modules/babel-loader/lib/index.js!my-meta-package/index.js 7e3949d45ab3c7431ae7f502c88d1403": "./my-meta-package/index.js",
+      "my-meta-package/node_modules/jquery/dist/jquery.js": "node_modules/jquery/dist/jquery.js",
+      "my-meta-package/node_modules/uuid/index.js": "node_modules/uuid/index.js",
+      "my-meta-package/node_modules/uuid/lib/bytesToUuid.js": "node_modules/uuid/lib/bytesToUuid.js",
+      "my-meta-package/node_modules/uuid/lib/rng-browser.js": "node_modules/uuid/lib/rng-browser.js",
+      "my-meta-package/node_modules/uuid/v1.js": "node_modules/uuid/v1.js",
+      "my-meta-package/node_modules/uuid/v4.js": "node_modules/uuid/v4.js",
+      "multi my-meta-package": 0
+    },
+```
+
+and the `bundle.js` looks like this
+
+```javascript
+webpackJsonp(
+  [0],
+  {
+    "./app.js": function(e, t, c) {
+      "use strict";
+      Object.defineProperty(t, "__esModule", { value: !0 });
+      var u = c("./my-meta-package/index.js");
+      Object(u.jquery)(document).ready(() => {
+        Object(u.jquery)("#welcome").text("welcome!"),
+          Object(u.jquery)("#uuid").text(Object(u.uuid)());
+      });
+    }
+  },
+  ["./app.js"]
+);
+```
+
+Now webpack is using the relative module path call the meta package. `var u = c("./my-meta-package/index.js");` and still referencing that meta package's dependencies with meta package i.e `u.jquery`
+
+In this example, as long as the path to `my-metadata-package` doesn't change, the module identifier won't change. So this means we should be able to use a new `bundle.js` file with a pre-existing `vendor.js` file.
+
+
+Lets try it out!
+
+I ran `npm run build` and have index.html pulled up in the browser, which references `bundle.js` and `vendor.js`. Website looks great!
+
+![AWESOME](https://i.imgur.com/HSN13SJ.png)
+
+Oh no! I forgot something in the application. I can fix it easily, but then I don't want to rebuild vendor.js again. Lets see if I can just update the code and use a new `bundle.js` 
+
+Let me move `vendor.js` since it will actually get rebuilt on the build step in this example, so we don't want it to get overwritten. (use a little suspended disbelief here)
+
+`mv vendor.js /tmp/vendor.old.js`
+
+Update app.js
+```diff
+ $(document).ready(() => {
+   $('#welcome').text('welcome!');
+-  $('#uuid').text(uuidv1());
++  $('#uuid').text("Your uuid is: " + uuid());
+ });
+```
+run `npm run build` again to generate new bundles
+
+copy over old `vendor.js` `cp /tmp/vendor.old.js vendor.js`
+
+We are now using a newly-generated `bundle.js` with updated code with a previously-generated `vendor.js` file. Website has the updated changes:
+
+![AWESOME2](https://i.imgur.com/YMX9VnM.png)
+
+If we look at the bundle.js, we can see the reference to the metadata package stayed the same ` var c = u("./my-meta-package/index.js");`, but the updated application code is there:
+
+```javascript
+webpackJsonp(
+  [0],
+  {
+    "./app.js": function(e, t, u) {
+      "use strict";
+      Object.defineProperty(t, "__esModule", { value: !0 });
+      var c = u("./my-meta-package/index.js");
+      Object(c.jquery)(document).ready(() => {
+        Object(c.jquery)("#welcome").text("welcome!"),
+          Object(c.jquery)("#uuid").text("Your uuid is: " + Object(c.uuid)());
+      });
+    }
+  },
+  ["./app.js"]
+);
+```
+
+Using a metadata package should allow you to re-use `vendor.js` bundles, as long as the module identifier to the metadata package does not change.

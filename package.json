@@ -4,9 +4,7 @@
   "description": "",
   "main": "app.js",
   "dependencies": {
-    "jquery": "3.3.1",
-    "uuid": "^3.3.2",
-    "webpack": "^3.11.0"
+    "my-meta-package": "file:my-meta-package"
   },
   "devDependencies": {
     "babel-core": "^6.24.1",
@@ -16,11 +14,14 @@
     "css-loader": "^0.28.0",
     "md5": "^2.2.1",
     "style-loader": "^0.16.1",
-    "uglifyjs-webpack-plugin": "^1.2.2"
+    "uglifyjs-webpack-plugin": "^1.2.2",
+    "webpack": "^3.11.0",
+    "webpack-dev-server": "^2.5.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "./node_modules/webpack/bin/webpack.js"
+    "build": "./node_modules/webpack/bin/webpack.js",
+    "dev": "./node_modules/.bin/webpack-dev-server"
   },
   "author": "",
   "license": "ISC"

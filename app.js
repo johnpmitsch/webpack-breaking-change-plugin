@@ -1,7 +1,6 @@
-import $ from "jquery";
-import uuidv1 from 'uuid';
+import { jquery as $, uuid } from 'my-meta-package';
 
 $(document).ready(() => {
   $('#welcome').text('welcome!');
-  $('#uuid').text(uuidv1());
+  $('#uuid').text("Your uuid is: " + uuid());
 });
