@@ -121,6 +121,7 @@ Now webpack is using the relative module path call the meta package. `var u = c(
 In this example, as long as the path to `my-metadata-package` doesn't change, the module identifier won't change. So this means we should be able to use a new `bundle.js` file with a pre-existing `vendor.js` file.
 
 
+### Using a new bundle.js with an old vendor.js
 Lets try it out!
 
 I ran `npm run build` and have index.html pulled up in the browser, which references `bundle.js` and `vendor.js`. Website looks great!
@@ -170,3 +171,48 @@ webpackJsonp(
 ```
 
 Using a metadata package should allow you to re-use `vendor.js` bundles, as long as the module identifier to the metadata package does not change.
+
+
+### Using a new vendor.js with old bundle.js
+
+I've ran a build `npm run build`
+
+Then moved bundle.js `mv bundle.js /tmp/bundle.old.js` so we can copy it back after the updated build runs.
+
+and I'm going to copy vendor.js to diff the new vendor.js against later `cp vendor.js /tmp/vendor.js`
+
+Now lets update the metapackage dependencies:
+
+In 'my-metadata-package', I am going to downgrade jquery to 3.2.1, since we use the same features that are in 3.2, we should be backwards compatible. If this works, we could upgrade the package too, but since this is the latest jquery, I am downgrading the package rather than upgrading.
+
+I'll also add a new package `date-fns`, just to ensure that adding a new package won't interfere with the compatibility
+
+```diff
+diff --git a/my-meta-package/package.json b/my-meta-package/package.json
+index 6726535..934db79 100644
+--- a/my-meta-package/package.json
++++ b/my-meta-package/package.json
+@@ -9,7 +9,8 @@
+   "author": "",
+   "license": "ISC",
+   "dependencies": {
+-    "jquery": "^3.3.1",
++    "date-fns": "^1.30.1",
++    "jquery": "3.2.1",
+     "uuid": "^3.3.2"
+   }
+```
+
+I had to pin jquery to an exact version to get ensure it resolves to installing a 3.2 version rather than 3.3
+
+I run `npm install` in both the root directory and `my-meta-package` to ensure packages are up to date
+
+then run `npm run build`
+
+`diff vendor.js /tmp/vendor.old.js` to ensure that the new vendor has changed.
+
+if we `diff bundle.js /tmp/bundle.old.js` we can see it has not changed so we already know this should work, but lets copy it over for good measure
+
+`cp /tmp/bundle.old.js  bundle.js`
+
+If we reload the page, we can see that the page still loads fine! So this means we can use an old bundle.js against a new vendor.js provided that it is using compatible code with the versions of packages vendor.js supplies
